@@ -1,6 +1,6 @@
 {
   "name": "ypioca",
-  "version": "6.7.9",
+  "version": "6.7.9-1",
   "description": "WhatsApp API",
   "keywords": [
     "whatsapp",
@@ -14,7 +14,7 @@
     "PingaSockets",
     "Ypioca"
   ],
-  "homepage": "https://github.com/PingaSockets/Ypioca",  
+  "homepage": "https://github.com/PingaSockets/Ypioca",
   "repository": {
     "type": "git",
     "url": "https://github.com/PingaSockets/Ypioca.git"
@@ -45,7 +45,7 @@
     "test": "jest",
     "upstream": "git fetch upstream && git fetch upstream-vreden",
     "merge": "git merge upstream/master && git merge upstream-vreden/master"
-    },
+  },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@hapi/boom": "^9.1.3",
