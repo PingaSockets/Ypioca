@@ -1,9 +1,11 @@
 {
+    "$schema": "https://typedoc.org/schema.json",
     "entryPoints": ["./src/index.ts"],
-    "excludePrivate": true,
-    "excludeProtected": true,
+    "excludePrivate": false,
+    "excludeProtected": false,
     "excludeExternals": true,
-    "includeVersion": false,
+    "includeVersion": true,
     "out": "docs",
-    "gaID": "G-WBY63HR4VS"
+    "gaID": "G-2VP5GRY6FH",
+    "plugin": ["typedoc-plugin-missing-exports"],
 }

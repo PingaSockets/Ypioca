@@ -14,6 +14,11 @@ type FetchAppStateSyncKey = (keyId: string) => Promise<proto.Message.IAppStateSy
 
 export type ChatMutationMap = { [index: string]: ChatMutation }
 
+/**
+ * Gera chaves de mutação a partir de uma chave de dados. *
+ * @param keydata - A chave de dados em formato Uint8Array.
+ * @returns Um objeto contendo as chaves de índice e de criptografia.
+ */
 const mutationKeys = (keydata: Uint8Array) => {
 	const expanded = hkdf(keydata, 160, { info: 'WhatsApp Mutation Keys' })
 	return {
@@ -25,6 +30,14 @@ const mutationKeys = (keydata: Uint8Array) => {
 	}
 }
 
+/**
+ * Gera um código MAC (Message Authentication Code) para uma operação específica.
+ * @param operation - A operação de mutação a ser realizada.
+ * @param data - Os dados para os quais o MAC será gerado.
+ * @param keyId - O ID da chave utilizada.
+ * @param key - A chave para o cálculo do MAC.
+ * @returns O código MAC gerado.
+ */
 const generateMac = (operation: proto.SyncdMutation.SyncdOperation, data: Buffer, keyId: Uint8Array | string, key: Buffer) => {
 	const getKeyData = () => {
 		let r: number
@@ -52,6 +65,11 @@ const generateMac = (operation: proto.SyncdMutation.SyncdOperation, data: Buffer
 	return hmac.slice(0, 32)
 }
 
+/**
+ * Converte um número para uma representação em ordem de rede de 64 bits.
+ * @param e - O número a ser convertido.
+ * @returns Um buffer representando o número em ordem de rede.
+ */
 const to64BitNetworkOrder = (e: number) => {
 	const buff = Buffer.alloc(8)
 	buff.writeUint32BE(e, 4)
@@ -60,6 +78,12 @@ const to64BitNetworkOrder = (e: number) => {
 
 type Mac = { indexMac: Uint8Array, valueMac: Uint8Array, operation: proto.SyncdMutation.SyncdOperation }
 
+/**
+ * Cria um gerador de hash LT (LTHash) para gerenciar operações de mutação.
+ * @param indexValueMap - Um mapa que associa índices a valores.
+ * @param hash - O hash atual do estado LTHash.
+ * @returns Um objeto com métodos para misturar e finalizar o hash.
+ */
 const makeLtHashGenerator = ({ indexValueMap, hash }: Pick<LTHashState, 'hash' | 'indexValueMap'>) => {
 	indexValueMap = { ...indexValueMap }
 	const addBuffs: ArrayBuffer[] = []
@@ -86,6 +110,10 @@ const makeLtHashGenerator = ({ indexValueMap, hash }: Pick<LTHashState, 'hash' |
 				subBuffs.push(new Uint8Array(prevOp.valueMac).buffer)
 			}
 		},
+		/**
+     * Finaliza o processo de mistura e retorna o hash resultante e o mapa de índices.
+     * @returns Um objeto contendo o hash e o mapa de índices atualizado.
+     */
 		finish: () => {
 			const hashArrayBuffer = new Uint8Array(hash).buffer
 			const result = LT_HASH_ANTI_TAMPERING.subtractThenAdd(hashArrayBuffer, addBuffs, subBuffs)
@@ -99,6 +127,14 @@ const makeLtHashGenerator = ({ indexValueMap, hash }: Pick<LTHashState, 'hash' |
 	}
 }
 
+/**
+ * Gera um código MAC para um snapshot do estado LTHash.
+ * @param lthash - O hash atual do estado LTHash.
+ * @param version - A versão do estado LTHash.
+ * @param name - O nome do patch associado.
+ * @param key - A chave utilizada para gerar o MAC.
+ * @returns O código MAC gerado para o snapshot.
+ */
 const generateSnapshotMac = (lthash: Uint8Array, version: number, name: WAPatchName, key: Buffer) => {
 	const total = Buffer.concat([
 		lthash,
@@ -108,6 +144,15 @@ const generateSnapshotMac = (lthash: Uint8Array, version: number, name: WAPatchN
 	return hmacSign(total, key, 'sha256')
 }
 
+/**
+ * Gera um código MAC para um patch baseado em um snapshot e valores MACs fornecidos.
+ * @param snapshotMac - O código MAC do snapshot.
+ * @param valueMacs - Uma lista de códigos MAC dos valores associados ao patch.
+ * @param version - A versão do patch sendo gerado.
+ * @param type - O tipo do patch associado.
+ * @param key - A chave utilizada para gerar o MAC do patch.
+ * @returns O código MAC gerado para o patch.
+ */
 const generatePatchMac = (snapshotMac: Uint8Array, valueMacs: Uint8Array[], version: number, type: WAPatchName, key: Buffer) => {
 	const total = Buffer.concat([
 		snapshotMac,
@@ -118,8 +163,21 @@ const generatePatchMac = (snapshotMac: Uint8Array, valueMacs: Uint8Array[], vers
 	return hmacSign(total, key)
 }
 
+/**
+ * Cria um novo estado LTHash inicializado com valores padrão.
+ * @returns Um novo estado LTHash com versão inicial e hash vazio.
+ */
 export const newLTHashState = (): LTHashState => ({ version: 0, hash: Buffer.alloc(128), indexValueMap: {} })
 
+/**
+ * Codifica um patch sincronizado a partir dos dados fornecidos e atualiza o estado LTHash correspondente.
+ * @param param0 - Objeto contendo os dados do patch a ser codificado.
+ * @param myAppStateKeyId - ID da chave do estado da aplicação do usuário atual.
+ * @param state - O estado LTHash atual a ser atualizado com as novas informações do patch.
+ * @param getAppStateSyncKey - Função que busca a chave do estado da aplicação com base no ID fornecido.
+ * @throws Se a chave não estiver presente ou se ocorrer um erro durante a codificação dos dados do patch.
+ * @returns Um objeto contendo o patch codificado e o estado atualizado LTHash.
+ */
 export const encodeSyncdPatch = async(
 	{ type, index, syncAction, apiVersion, operation }: WAPatchCreate,
 	myAppStateKeyId: string,
@@ -185,6 +243,19 @@ export const encodeSyncdPatch = async(
 	return { patch, state }
 }
 
+/**
+* Decodifica mutações sincronizadas a partir das mensagens recebidas e atualiza o estado LTHash correspondente.
+*
+* @param msgMutations - Lista de mutações recebidas que precisam ser decodificadas.
+* @param initialState - O estado inicial LTHash antes da aplicação das mutações.
+* @param getAppStateSyncKey - Função que busca a chave do estado da aplicação com base no ID fornecido.
+* @param onMutation - Função callback que é chamada para cada mutação decodificada.
+* @param validateMacs - Indica se as verificações de integridade devem ser realizadas.
+*
+* @throws Se ocorrer um erro durante a verificação das HMAC ou na decodificação das mutações.
+*
+* @returns O estado LTHash atualizado após aplicar as mutações.
+*/
 export const decodeSyncdMutations = async(
 	msgMutations: (proto.ISyncdMutation | proto.ISyncdRecord)[],
 	initialState: LTHashState,
@@ -246,6 +317,20 @@ export const decodeSyncdMutations = async(
 	}
 }
 
+/**
+* Decodifica um patch sincronizado a partir da mensagem recebida e valida sua integridade.
+*
+* @param msg - O patch sincronizado recebido que precisa ser decodificado.
+* @param name - O nome associado ao patch.
+* @param initialState - O estado inicial LTHash antes da aplicação do patch.
+* @param getAppStateSyncKey - Função que busca a chave do estado da aplicação com base no ID fornecido.
+* @param onMutation - Função callback que é chamada para cada mutação decodificada.
+* @param validateMacs - Indica se as verificações de integridade devem ser realizadas.
+*
+* @throws Se ocorrer um erro durante a verificação das HMAC ou na decodificação do patch.
+*
+* @returns O estado LTHash atualizado após aplicar as mutações contidas no patch.
+*/
 export const decodeSyncdPatch = async(
 	msg: proto.ISyncdPatch,
 	name: WAPatchName,
@@ -274,6 +359,14 @@ export const decodeSyncdPatch = async(
 	return result
 }
 
+/**
+* Extrai patches sincronizados a partir de um nó binário recebido e retorna suas informações estruturadas.
+*
+* @param result - O nó binário contendo os dados sincronizados recebidos.
+* @param options - Opções adicionais para configuração da requisição HTTP ao extrair os dados.
+*
+* @returns Um objeto contendo os patches extraídos organizados por nome e informações sobre mais patches disponíveis.
+*/
 export const extractSyncdPatches = async(
 	result: BinaryNode,
 	options: AxiosRequestConfig<{}>
@@ -331,7 +424,13 @@ export const extractSyncdPatches = async(
 	return final
 }
 
-
+/**
+ * Downloads the content of an external blob and returns it as a concatenated Buffer.
+ *
+ * @param {proto.IExternalBlobReference} blob - The reference to the external blob to download.
+ * @param {AxiosRequestConfig<{}>} options - Axios request configuration options.
+ * @returns {Promise<Buffer>} A promise that resolves to a Buffer containing the downloaded content.
+ */
 export const downloadExternalBlob = async(
 	blob: proto.IExternalBlobReference,
 	options: AxiosRequestConfig<{}>
@@ -345,6 +444,13 @@ export const downloadExternalBlob = async(
 	return Buffer.concat(bufferArray)
 }
 
+/**
+ * Downloads the content of an external blob and returns it as a concatenated Buffer.
+ *
+ * @param {proto.IExternalBlobReference} blob - The reference to the external blob to download.
+ * @param {AxiosRequestConfig<{}>} options - Axios request configuration options.
+ * @returns {Promise<Buffer>} A promise that resolves to a Buffer containing the downloaded content.
+ */
 export const downloadExternalPatch = async(
 	blob: proto.IExternalBlobReference,
 	options: AxiosRequestConfig<{}>
@@ -354,6 +460,16 @@ export const downloadExternalPatch = async(
 	return syncData
 }
 
+/**
+ * Decodes a synchronized snapshot and validates its MAC if required.
+ *
+ * @param {WAPatchName} name - The name of the patch being processed.
+ * @param {proto.ISyncdSnapshot} snapshot - The snapshot containing the state data.
+ * @param {FetchAppStateSyncKey} getAppStateSyncKey - Function to fetch the app state sync key.
+ * @param {number | undefined} minimumVersionNumber - Minimum version number for validation.
+ * @param {boolean} [validateMacs=true] - Flag indicating whether to validate MACs.
+ * @returns {Promise<{ state: LTHashState, mutationMap: ChatMutationMap }>} A promise resolving to the new state and mutation map.
+ */
 export const decodeSyncdSnapshot = async(
 	name: WAPatchName,
 	snapshot: proto.ISyncdSnapshot,
@@ -403,6 +519,19 @@ export const decodeSyncdSnapshot = async(
 	}
 }
 
+/**
+ * Decodes multiple patches and updates the application state accordingly.
+ *
+ * @param {WAPatchName} name - The name of the patch being processed.
+ * @param {proto.ISyncdPatch[]} syncds - Array of synchronized patches to decode.
+ * @param {LTHashState} initial - The initial application state before decoding patches.
+ * @param {FetchAppStateSyncKey} getAppStateSyncKey - Function to fetch the app state sync key.
+ * @param {AxiosRequestConfig<{}>} options - Axios request configuration options.
+ * @param {number} [minimumVersionNumber] - Minimum version number for validation.
+ * @param {Logger} [logger] - Logger instance for logging actions during processing.
+ * @param {boolean} [validateMacs=true] - Flag indicating whether to validate MACs during processing.
+ * @returns {Promise<{ state: LTHashState, mutationMap: ChatMutationMap }>} A promise resolving to the updated state and mutation map.
+ */
 export const decodePatches = async(
 	name: WAPatchName,
 	syncds: proto.ISyncdPatch[],
@@ -472,11 +601,24 @@ export const decodePatches = async(
 	return { state: newState, mutationMap }
 }
 
+/**
+ * Converts chat modifications into an application patch format for synchronization.
+ *
+ * @param {ChatModification} mod - The modification details for the chat action.
+ * @param {string} jid - The JID of the chat associated with the modification.
+ * @returns {WAPatchCreate} The created application patch based on the modification type.
+ */
 export const chatModificationToAppPatch = (
 	mod: ChatModification,
 	jid: string
 ) => {
 	const OP = proto.SyncdMutation.SyncdOperation
+	/**
+     * Retrieves message range from last messages list for archiving or deleting actions.
+     *
+     * @param {LastMessageList} lastMessages - The list of last messages in the chat context.
+     * @returns {proto.SyncActionValue.ISyncActionMessageRange} The message range object for synchronization actions.
+     */
 	const getMessageRange = (lastMessages: LastMessageList) => {
 		let messageRange: proto.SyncActionValue.ISyncActionMessageRange
 		if(Array.isArray(lastMessages)) {
@@ -513,6 +655,7 @@ export const chatModificationToAppPatch = (
 	}
 
 	let patch: WAPatchCreate
+	// Determine which modification type is being processed and create corresponding patch
 	if('mute' in mod) {
 		patch = {
 			syncAction: {
@@ -711,6 +854,15 @@ export const chatModificationToAppPatch = (
 	return patch
 }
 
+/**
+ * Processes a synchronization action and emits corresponding events based on its type.
+ *
+ * @param {ChatMutation} syncAction - The synchronization action object containing details about changes made in chat or contacts.
+ * @param {BaileysEventEmitter} ev - Event emitter instance for broadcasting updates across the application.
+ * @param {Contact} me - The current user's contact information for context during updates.
+ * @param {InitialAppStateSyncOptions} [initialSyncOpts] - Options related to initial synchronization state settings.
+ * @param {Logger} [logger] - Logger instance for logging actions during processing.
+ */
 export const processSyncAction = (
 	syncAction: ChatMutation,
 	ev: BaileysEventEmitter,

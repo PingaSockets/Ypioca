@@ -1,0 +1,45 @@
+# Esse Workflows executa o merge automaticamente todos os dias com a WhiskeySockets/Baileys.
+# Caso haja conflito, deverá ser resolvido manualmente.
+
+name: Sync Fork with Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Executa todos os dias à meia-noite (UTC)
+  workflow_dispatch:  # Permite iniciar manualmente o workflow
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Faz com que o git fetch pegue todo o histórico
+
+      - name: Set up Git
+        uses: actions/setup-git@v3
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/WhiskeySockets/Baileys.git
+          git fetch upstream
+
+      - name: Sync with upstream (master / main branch)
+        run: |
+          git checkout main  # branch principal (alterado para main)
+          git merge upstream/master --allow-unrelated-histories --no-edit  # Pega as atualizações da branch 'master' do upstream
+          git push origin main  # Envia atualizações. branch principal (alterado para main)
+
+      - name: Sync with upstream (all other branches)
+        run: |
+          # Obter todas as branches do upstream
+          git branch -r | grep 'upstream/' | while read branch; do
+            branch_name=$(echo $branch | sed 's/upstream\///')
+            echo "Sincronizando com a branch: $branch_name"
+            # Se a branch não existir localmente, cria-a
+            git checkout -B $branch_name upstream/$branch_name
+            git merge upstream/$branch_name --allow-unrelated-histories --no-edit
+            git push origin $branch_name
+          done

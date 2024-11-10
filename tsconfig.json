@@ -1,20 +1,21 @@
 {
   "compilerOptions": {
-    "target": "es2018",
-    "module": "CommonJS",
+    "target": "ES2021", // es2020
+    "module": "NodeNext", // ESNext/ES6
     "experimentalDecorators": true,
     "allowJs": false,
     "checkJs": false,
     "outDir": "lib",
-    "strict": false,
+    "strict": false, //true
     "strictNullChecks": true,
     "skipLibCheck": true,
     "noImplicitThis": true,
     "esModuleInterop": true,
+    "moduleResolution": "NodeNext",
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "lib": ["es2020", "esnext.array", "DOM"]
+    //"lib": ["es2020", "esnext.array", "DOM"]
   },
   "include": ["./src/**/*.ts"],
   "exclude": ["node_modules", "src/Tests/*", "src/Binary/GenerateStatics.ts"]

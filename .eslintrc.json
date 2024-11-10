@@ -24,6 +24,7 @@
         "no-restricted-syntax": "off",
         "keyword-spacing": [
             "warn"
-        ]
+        ],
+        "linebreak-style": ["off"] // adicionado porque uso windows
     }
 }

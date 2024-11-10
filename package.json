@@ -1,5 +1,5 @@
 {
-  "name": "baileys",
+  "name": "ypioca",
   "version": "6.7.9",
   "description": "WhatsApp API",
   "keywords": [
@@ -10,11 +10,14 @@
     "whatsapp-chat",
     "whatsapp-group",
     "automation",
-    "multi-device"
+    "multi-device",
+    "PingaSockets",
+    "Ypioca"
   ],
-  "homepage": "https://github.com/WhiskeySockets/Baileys",
+  "homepage": "https://github.com/PingaSockets/Ypioca",  
   "repository": {
-    "url": "git@github.com:WhiskeySockets/Baileys.git"
+    "type": "git",
+    "url": "https://github.com/PingaSockets/Ypioca.git"
   },
   "license": "MIT",
   "author": "Adhiraj Singh",
@@ -39,8 +42,10 @@
     "prepack": "tsc",
     "prepare": "tsc",
     "release": "release-it",
-    "test": "jest"
-  },
+    "test": "jest",
+    "upstream": "git fetch upstream && git fetch upstream-vreden",
+    "merge": "git merge upstream/master && git merge upstream-vreden/master"
+    },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@hapi/boom": "^9.1.3",
@@ -79,6 +84,7 @@
     "ts-jest": "^27.0.3",
     "ts-node": "^10.8.1",
     "typedoc": "^0.24.7",
+    "typedoc-plugin-missing-exports": "^3.0.0",
     "typescript": "^4.6.4"
   },
   "peerDependencies": {
