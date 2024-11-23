@@ -18,9 +18,11 @@ jobs:
         with:
           fetch-depth: 0  # Faz com que o git fetch pegue todo o histórico
 
-      - name: Set up Git
-        uses: actions/setup-git@v3
-
+      - name: Set up Git user
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          
       - name: Add upstream remote
         run: |
           git remote add upstream https://github.com/WhiskeySockets/Baileys.git
