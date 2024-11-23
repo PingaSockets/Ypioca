@@ -1617,9 +1617,9 @@
     "@wasm-audio-decoders/common" "9.0.5"
     codec-parser "2.5.0"
 
-"@whiskeysockets/eslint-config@github:whiskeysockets/eslint-config":
+"@whiskeysockets/eslint-config@git+https://github.com/whiskeysockets/eslint-config.git":
   version "1.0.0"
-  resolved "https://codeload.github.com/whiskeysockets/eslint-config/tar.gz/326b55f2842668f4e11f471451c4e39819a0e1bf"
+  resolved "git+https://github.com/whiskeysockets/eslint-config.git#326b55f2842668f4e11f471451c4e39819a0e1bf"
   dependencies:
     "@typescript-eslint/eslint-plugin" "^7.15.0"
     "@typescript-eslint/parser" "^7.15.0"
