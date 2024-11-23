@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Fetch All Branches",
+			"type": "shell",
+			"command": "git fetch --all",
+			"problemMatcher": [],
+			"runOptions": {
+				"runOn": "folderOpen" // Executa ao abrir a pasta no VSCode
+			}
+		},
+	]
+}
