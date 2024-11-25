@@ -1,3 +1,7 @@
+## [6.7.9-2](https://github.com/PingaSockets/Ypioca/compare/v6.7.9-1...v6.7.9-2) (2024-11-23)
+
+
+
 ## [6.7.9-1](https://github.com/PingaSockets/Ypioca/compare/v6.7.9...v6.7.9-1) (2024-11-10)
 
 
@@ -721,8 +725,6 @@
 * Revert "temp: do not handle dirty account_sync" ([56139b2](https://github.com/PingaSockets/Ypioca/commit/56139b2d0300cca388aff57459283a1c76f58ee3))
 * Revert "chore: disable init queries" ([b3e8b38](https://github.com/PingaSockets/Ypioca/commit/b3e8b38917fa86a0621832ecf743746675d22f62))
 * Revert "chore: add WS ping" ([c4ffb2b](https://github.com/PingaSockets/Ypioca/commit/c4ffb2bfaf4184dcdcfeabdf3b147b0a9e3d4cd2))
-* Revert "feat: resync main app state on first open" ([2cc5cc2](https://github.com/PingaSockets/Ypioca/commit/2cc5cc2dd4424b4aeed700f62b4b59e6a3e3856e))
-* Revert "fix: remove redundant collectionSync" ([85574d1](https://github.com/PingaSockets/Ypioca/commit/85574d1d795f32f75f98dfd9ef52242960c68f2b))
 
 
 

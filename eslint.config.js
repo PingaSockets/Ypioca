@@ -1,6 +1,29 @@
-/** @type {import('eslint').Linter.Config} */
-module.exports [
-  {
+import eslintConfigPingasockets from '@pingasockets/eslint-config'
+import globals from 'globals'
+
+export default [
+    // Extensão da configuração base
+    ...eslintConfigPingasockets,
+
+    // Configuração adicional específica do projeto
+    {
+        files: ['**/*.ts'], // Aplica a configuração a arquivos TypeScript
+        languageOptions: {
+            ecmaVersion: 'latest', // Define a versão do ECMAScript
+            sourceType: 'module', // Define que o código usa módulos ES
+            globals: {
+                ...globals.es2023 // Inclui globais do ES2023
+            },
+            parser: '@typescript-eslint/parser', // Define o parser TypeScript
+            parserOptions: {
+                project: './tsconfig.json' // Define o caminho do tsconfig.json
+            }
+        }
+    }
+]
+
+/**
+module.exports = {
     extends: '@pingasockets',
     parserOptions: {
       sourceType: 'module',
@@ -21,8 +44,9 @@ module.exports [
       'linebreak-style': ['off'] // adicionado porque uso windows
     },
     overrides: [
-      {
-        files: ['src/**/*.{js,ts}'] // Lint all JavaScript and TypeScript files in src and subdirectories
+      {*/
+        //files: ['src/**/*.{js,ts}'] // Lint all JavaScript and TypeScript files in src and subdirectories
+        /**
       }
     ]
   },
@@ -34,5 +58,5 @@ module.exports [
       "WAProto/**",       // Ignora toda a pasta WAProto
       "WASignalGroup/**",  // Ignora toda a pasta WASignalGroup
 	], 
-  }
-];
+}
+*/
