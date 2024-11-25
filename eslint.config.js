@@ -1,7 +1,7 @@
 /** @type {import('eslint').Linter.Config} */
 module.exports [
   {
-    extends: '@whiskeysockets',
+    extends: '@pingasockets',
     parserOptions: {
       sourceType: 'module',
       project: './tsconfig.json'

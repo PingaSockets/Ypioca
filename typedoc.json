@@ -6,6 +6,5 @@
     "excludeExternals": true,
     "includeVersion": true,
     "out": "docs",
-    "gaID": "G-2VP5GRY6FH",
     "plugin": ["typedoc-plugin-missing-exports"],
 }
