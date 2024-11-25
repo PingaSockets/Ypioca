@@ -1,100 +1,110 @@
-import { caching, Store } from 'cache-manager'
-import { proto } from '../../WAProto'
-import { AuthenticationCreds } from '../Types'
-import { BufferJSON, initAuthCreds } from '../Utils'
-import logger from '../Utils/logger'
+import { createCache } from 'cache-manager'; // Atualizado para nova API
+import { proto } from '../../WAProto';
+import { AuthenticationCreds } from '../Types';
+import { BufferJSON, initAuthCreds } from '../Utils';
+import logger from '../Utils/logger';
 
-const makeCacheManagerAuthState = async(store: Store, sessionKey: string) => {
-	const defaultKey = (file: string): string => `${sessionKey}:${file}`
+const makeCacheManagerAuthState = async (sessionKey: string) => {
+    const defaultKey = (file: string): string => `${sessionKey}:${file}`;
 
-	const databaseConn = await caching(store)
+    const databaseConn = createCache();
 
-	const writeData = async(file: string, data: object) => {
-		let ttl: number | undefined = undefined
-		if(file === 'creds') {
-			ttl = 63115200 // 2 years
-		}
+    const writeData = async (file: string, data: object) => {
+        let ttl: number | undefined = undefined;
+        if (file === 'creds') {
+            ttl = 63115200; // 2 years
+        }
 
-		await databaseConn.set(
-			defaultKey(file),
-			JSON.stringify(data, BufferJSON.replacer),
-			ttl
-		)
-	}
+        await databaseConn.set(
+            defaultKey(file),
+            JSON.stringify(data, BufferJSON.replacer),
+            ttl
+        );
+    };
 
-	const readData = async(file: string): Promise<AuthenticationCreds | null> => {
-		try {
-			const data = await databaseConn.get(defaultKey(file))
+    const readData = async (file: string): Promise<AuthenticationCreds | null> => {
+        try {
+            const data = await databaseConn.get(defaultKey(file));
 
-			if(data) {
-				return JSON.parse(data as string, BufferJSON.reviver)
-			}
+            if (data) {
+                return JSON.parse(data as string, BufferJSON.reviver);
+            }
 
-			return null
-		} catch(error) {
-			logger.error(error)
-			return null
-		}
-	}
+            return null;
+        } catch (error) {
+            logger.error(error);
+            return null;
+        }
+    };
 
-	const removeData = async(file: string) => {
-		try {
-			return await databaseConn.del(defaultKey(file))
-		} catch{
-			logger.error(`Error removing ${file} from session ${sessionKey}`)
-		}
-	}
+    const removeData = async (file: string): Promise<void> => {
+        try {
+            await databaseConn.del(defaultKey(file));
+        } catch {
+            logger.error(`Error removing ${file} from session ${sessionKey}`);
+        }
+    };    
 
-	const clearState = async() => {
-		try {
-			const result = await databaseConn.store.keys(`${sessionKey}*`)
-			await Promise.all(
-				result.map(async(key) => await databaseConn.del(key))
-			)
-		} catch(err) {
-		}
-	}
+    const clearState = async () => {
+        try {
+            const trackedKeys: string[] = (await databaseConn.get('trackedKeys')) || []; // Tipado corretamente como array
+            await Promise.all(
+                trackedKeys.map(async (key) => await databaseConn.del(key))
+            );
+            await databaseConn.set('trackedKeys', []); // Limpar rastreamento
+        } catch (err) {
+            logger.error(`Error clearing state for session ${sessionKey}:`, err);
+        }
+    };
 
-	const creds: AuthenticationCreds = (await readData('creds')) || initAuthCreds()
+    const creds: AuthenticationCreds = (await readData('creds')) || initAuthCreds();
 
-	return {
-		clearState,
-		saveCreds: () => writeData('creds', creds),
-		state: {
-			creds,
-			keys: {
-				get: async(type: string, ids: string[]) => {
-					const data = {}
-					await Promise.all(
-						ids.map(async(id) => {
-							let value: proto.Message.AppStateSyncKeyData | AuthenticationCreds | null =
-                                await readData(`${type}-${id}`)
-							if(type === 'app-state-sync-key' && value) {
-								value = proto.Message.AppStateSyncKeyData.fromObject(value)
-							}
+    return {
+        clearState,
+        saveCreds: () => writeData('creds', creds),
+        state: {
+            creds,
+            keys: {
+                get: async (type: string, ids: string[]) => {
+                    const data = {};
+                    await Promise.all(
+                        ids.map(async (id) => {
+                            let value: proto.Message.AppStateSyncKeyData | AuthenticationCreds | null =
+                                await readData(`${type}-${id}`);
+                            if (type === 'app-state-sync-key' && value) {
+                                value = proto.Message.AppStateSyncKeyData.fromObject(value);
+                            }
 
-							data[id] = value
-						})
-					)
+                            data[id] = value;
+                        })
+                    );
 
-					return data
-				},
-				set: async(data) => {
-					// eslint-disable-next-line @typescript-eslint/no-explicit-any
-					const tasks: Promise<any>[] = []
-					for(const category in data) {
-						for(const id in data[category]) {
-							const value = data[category][id]
-							const key = `${category}-${id}`
-							tasks.push(value ? writeData(key, value) : removeData(key))
-						}
-					}
+                    return data;
+                },
+                set: async (data) => {
+                    const tasks: Promise<void>[] = [];
+                    let trackedKeys: string[] = (await databaseConn.get('trackedKeys')) || []; // Inicializado como array vazio
 
-					await Promise.all(tasks)
-				},
-			}
-		}
-	}
-}
+                    for (const category in data) {
+                        for (const id in data[category]) {
+                            const value = data[category][id];
+                            const key = `${category}-${id}`;
+                            tasks.push(value ? writeData(key, value) : removeData(key));
+                            if (value && !trackedKeys.includes(key)) {
+                                trackedKeys.push(key); // Adiciona chave ao rastreamento
+                            } else if (!value) {
+                                const index = trackedKeys.indexOf(key);
+                                if (index !== -1) trackedKeys.splice(index, 1); // Remove chave do rastreamento
+                            }
+                        }
+                    }
 
-export default makeCacheManagerAuthState
+                    await databaseConn.set('trackedKeys', trackedKeys); // Atualiza rastreamento
+                    await Promise.all(tasks);
+                },
+            },
+        },
+    };
+};
+
+export default makeCacheManagerAuthState;
