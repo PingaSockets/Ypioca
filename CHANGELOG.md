@@ -1,3 +1,7 @@
+## [6.7.9-3](https://github.com/PingaSockets/Ypioca/compare/v6.7.9-2...v6.7.9-3) (2024-12-09)
+
+
+
 ## [6.7.9-2](https://github.com/PingaSockets/Ypioca/compare/v6.7.9-1...v6.7.9-2) (2024-11-23)
 
 
