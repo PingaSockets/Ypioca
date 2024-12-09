@@ -126,7 +126,7 @@ export const extractDeviceJids = (result: BinaryNode, myJid: string, excludeZero
 				const deviceListNode = getBinaryNodeChild(devicesNode, 'device-list')
 				if(Array.isArray(deviceListNode?.content)) {
 					//eslint-disable-next-line max-depth
-					for(const { tag, attrs } of deviceListNode!.content) {
+					for(const { tag, attrs } of deviceListNode.content) {
 						const device = +attrs.id
 						//eslint-disable-next-line max-depth
 						if(

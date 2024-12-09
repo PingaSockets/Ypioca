@@ -52,6 +52,8 @@ const makeCacheManagerAuthState = async(store: Store, sessionKey: string) => {
 				result.map(async(key) => await databaseConn.del(key))
 			)
 		} catch(err) {
+		    // Intencionalmente ignorado
+		    console.error('Erro ao limpar o estado:', err)
 		}
 	}
 
