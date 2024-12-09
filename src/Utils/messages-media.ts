@@ -4,7 +4,6 @@ import { exec } from 'child_process'
 import * as Crypto from 'crypto'
 import { once } from 'events'
 import { createReadStream, createWriteStream, promises as fs, WriteStream } from 'fs'
-import type { IAudioMetadata } from 'music-metadata'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { Logger } from 'pino'
@@ -16,38 +15,27 @@ import { BaileysEventMap, DownloadableMessage, MediaConnInfo, MediaDecryptionKey
 import { BinaryNode, getBinaryNodeChild, getBinaryNodeChildBuffer, jidNormalizedUser } from '../WABinary'
 import { aesDecryptGCM, aesEncryptGCM, hkdf } from './crypto'
 import { generateMessageID } from './generics'
+import sharp from 'sharp'
 
 const getTmpFilesDirectory = () => tmpdir()
 
-const getImageProcessingLibrary = async() => {
-	const [_jimp, sharp] = await Promise.all([
-		(async() => {
-			const jimp = await (
-				import('jimp')
-					.catch(() => { })
-			)
-			return jimp
-		})(),
-		(async() => {
-			const sharp = await (
-				import('sharp')
-					.catch(() => { })
-			)
-			return sharp
-		})()
-	])
-
-	if(sharp) {
-		return { sharp }
+const getImageProcessingLibrary = async () => {
+	// Tentativa de importar dinamicamente Jimp e Sharp
+	const _jimp = await import('jimp').catch(() => null);
+	const sharp = await import('sharp').catch(() => null);
+  
+	// Se a biblioteca sharp estiver disponível, retornamos ela
+	if (sharp) {
+	  return { sharp };
 	}
-
-	const jimp = _jimp?.default || _jimp
-	if(jimp) {
-		return { jimp }
+  
+	// Se _jimp foi importado corretamente, retornamos o módulo Jimp
+	if (_jimp) {
+	  return { jimp: _jimp };  // Retorna o módulo inteiro, sem a necessidade de 'default'
 	}
-
-	throw new Boom('No image processing library available')
-}
+  
+	throw new Error('No image processing library available');
+};
 
 export const hkdfInfoKey = (type: MediaType) => {
 	const hkdfInfo = MEDIA_HKDF_KEY_MAPPING[type]
@@ -90,7 +78,56 @@ const extractVideoThumb = async(
     	})
 })
 
-export const extractImageThumb = async(bufferOrFilePath: Readable | Buffer | string, width = 32) => {
+/**
+ * Extracts the thumbnail of an image from a given buffer or file path.
+ * @param {Readable | Buffer | string} bufferOrFilePath the buffer or file path of the image
+ * @param {number} [width=32] the desired width of the thumbnail
+ * @returns {Promise<{ buffer: Buffer, original: { width: number, height: number } }>} a Promise that resolves to an object with the thumbnail buffer and the original dimensions of the image
+ */
+export const extractImageThumb = async (bufferOrFilePath: Readable | Buffer | string, width: number = 32): Promise<{ buffer: Buffer; original: { width: number; height: number } }> => {
+	if (bufferOrFilePath instanceof Readable) {
+	  bufferOrFilePath = await toBuffer(bufferOrFilePath);
+	}
+  
+	const lib: any = await getImageProcessingLibrary();
+	
+	if ('sharp' in lib && typeof lib.sharp === 'function') {
+
+	  const img = lib.sharp(bufferOrFilePath);
+	  const dimensions = await img.metadata();
+  
+	  const buffer = await img
+		.resize(width)
+		.jpeg({ quality: 50 })
+		.toBuffer();
+	  return {
+		buffer,
+		original: {
+		  width: dimensions.width,
+		  height: dimensions.height,
+		},
+	  };
+	} else if ('jimp' in lib) {
+	  const jimp = await lib.jimp.read(bufferOrFilePath as string);
+	  const dimensions = {
+		width: jimp.getWidth(),
+		height: jimp.getHeight(),
+	  };
+	  const buffer = await jimp
+		.resize(width, jimp.AUTO)  // Resize usando o valor automático para altura
+		.quality(50)               // Definindo qualidade da imagem
+		.getBufferAsync(jimp.MIME_JPEG);  // Gerando o buffer no formato JPEG
+	  return {
+		buffer,
+		original: dimensions,
+	  };
+	} else {
+	  throw new Boom('No image processing library available');
+	}
+  };
+
+
+export const extractImageThumb2 = async(bufferOrFilePath: Readable | Buffer | string, width = 32) => {
 	if(bufferOrFilePath instanceof Readable) {
 		bufferOrFilePath = await toBuffer(bufferOrFilePath)
 	}
@@ -111,26 +148,11 @@ export const extractImageThumb = async(bufferOrFilePath: Readable | Buffer | str
 				height: dimensions.height,
 			},
 		}
-	} else if('jimp' in lib && typeof lib.jimp?.read === 'function') {
-		const { read, MIME_JPEG, RESIZE_BILINEAR, AUTO } = lib.jimp
-
-		const jimp = await read(bufferOrFilePath as string)
-		const dimensions = {
-			width: jimp.getWidth(),
-			height: jimp.getHeight()
-		}
-		const buffer = await jimp
-			.quality(50)
-			.resize(width, AUTO, RESIZE_BILINEAR)
-			.getBufferAsync(MIME_JPEG)
-		return {
-			buffer,
-			original: dimensions
-		}
 	} else {
 		throw new Boom('No image processing library available')
 	}
 }
+
 
 export const encodeBase64EncodedStringForUpload = (b64: string) => (
 	encodeURIComponent(
@@ -141,43 +163,48 @@ export const encodeBase64EncodedStringForUpload = (b64: string) => (
 	)
 )
 
-export const generateProfilePicture = async(mediaUpload: WAMediaUpload) => {
-	let bufferOrFilePath: Buffer | string
-	if(Buffer.isBuffer(mediaUpload)) {
-		bufferOrFilePath = mediaUpload
-	} else if('url' in mediaUpload) {
-		bufferOrFilePath = mediaUpload.url.toString()
+export const generateProfilePicture = async (mediaUpload: WAMediaUpload) => {
+	let bufferOrFilePath: Buffer | string;
+  
+	// Determina o tipo de mediaUpload e converte para um formato adequado
+	if (Buffer.isBuffer(mediaUpload)) {
+	  bufferOrFilePath = mediaUpload;
+	} else if ('url' in mediaUpload) {
+	  bufferOrFilePath = mediaUpload.url.toString();
 	} else {
-		bufferOrFilePath = await toBuffer(mediaUpload.stream)
+	  bufferOrFilePath = await toBuffer(mediaUpload.stream);
 	}
-
-	const lib = await getImageProcessingLibrary()
-	let img: Promise<Buffer>
-	if('sharp' in lib && typeof lib.sharp?.default === 'function') {
-		img = lib.sharp.default(bufferOrFilePath)
-			.resize(640, 640)
-			.jpeg({
-				quality: 50,
-			})
-			.toBuffer()
-	} else if('jimp' in lib && typeof lib.jimp?.read === 'function') {
-		const { read, MIME_JPEG, RESIZE_BILINEAR } = lib.jimp
-		const jimp = await read(bufferOrFilePath as string)
-		const min = Math.min(jimp.getWidth(), jimp.getHeight())
-		const cropped = jimp.crop(0, 0, min, min)
-
-		img = cropped
-			.quality(50)
-			.resize(640, 640, RESIZE_BILINEAR)
-			.getBufferAsync(MIME_JPEG)
+  
+	const lib = await getImageProcessingLibrary();
+	let img: Promise<Buffer>;
+  
+	if ('sharp' in lib && lib.sharp?.default) { // Verifica se sharp está disponível
+	  img = lib.sharp.default(bufferOrFilePath)
+		.resize(640, 640)
+		.jpeg({
+		  quality: 50,
+		})
+		.toBuffer();
+	} else if ('jimp' in lib) { // Verifica se Jimp está disponível
+	  const { Jimp, JimpMime, ResizeStrategy } = await import('jimp') // lib.jimp >> Jimp
+	  const jimp = await Jimp.read(bufferOrFilePath as string); // Importa e lê a imagem com Jimp	  
+	  const min = Math.min(jimp?.width as number, jimp?.height as number); // Obtém o tamanho mínimo para cropping
+	  const cropped = jimp?.crop({ x: 0, y: 0, w: min, h: min }); // Recorta a imagem
+  
+	  img = cropped
+		?.resize({w: 640, h: 640, mode: ResizeStrategy.BILINEAR}) // Redimensiona com interpolação bilinear
+		//?.quality(50) // Define a qualidade para 50
+		?.getBuffer(JimpMime.jpeg); // Obtém o buffer em formato JPEG
 	} else {
-		throw new Boom('No image processing library available')
+	  throw new Boom('No image processing library available');
 	}
-
+  
+	// Retorna a imagem processada
 	return {
-		img: await img,
-	}
-}
+	  img: await img,
+	};
+  };
+
 
 /** gets the SHA256 of the given media message */
 export const mediaMessageSHA256B64 = (message: WAMessageContent) => {
@@ -187,7 +214,7 @@ export const mediaMessageSHA256B64 = (message: WAMessageContent) => {
 
 export async function getAudioDuration(buffer: Buffer | string | Readable) {
 	const musicMetadata = await import('music-metadata')
-	let metadata: IAudioMetadata
+	let metadata: any // music-metadata-IAudioMetadata
 	if(Buffer.isBuffer(buffer)) {
 		metadata = await musicMetadata.parseBuffer(buffer, undefined, { duration: true })
 	} else if(typeof buffer === 'string') {
