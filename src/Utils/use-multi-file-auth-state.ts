@@ -39,6 +39,9 @@ export const useMultiFileAuthState = async(folder: string): Promise<{ state: Aut
 			)
 			return JSON.parse(data, BufferJSON.reviver)
 		} catch(error) {
+			console.error('Error reading file:', error instanceof Error ? error.message : error)
+    		console.error('File path:', file)
+    		console.error('Stack trace:', error.stack)
 			return null
 		}
 	}

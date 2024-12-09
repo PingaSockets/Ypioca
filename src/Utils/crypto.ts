@@ -35,6 +35,8 @@ export const Curve = {
 			libsignal.curve.verifySignature(generateSignalPubKey(pubKey), message, signature)
 			return true
 		} catch(error) {
+			console.warn('Verification failed:', error instanceof Error ? error.message : error)
+      		console.warn('Stack trace:', error.stack)
 			return false
 		}
 	}

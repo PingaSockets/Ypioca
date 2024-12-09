@@ -11,7 +11,7 @@ type MessageType = 'chat' | 'peer_broadcast' | 'other_broadcast' | 'group' | 'di
 
 /**
  * Decode the received node as a message.
- * @note this will only parse the message, not decrypt it
+ * @remarks this will only parse the message, not decrypt it
  */
 export function decodeMessageNode(
 	stanza: BinaryNode,

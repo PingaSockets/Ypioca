@@ -1,38 +1,41 @@
-/** @type {import('eslint').Linter.Config} */
-module.exports [
+// eslint.config.js
+import sharedConfig from '@pingasockets/eslint-config-ypioca';
+
+export default [
+  ...sharedConfig,
+
+ //regras personalizadas deste projeto 
   {
-    extends: '@whiskeysockets',
-    parserOptions: {
+	rules: {
+		"no-restricted-syntax": "off"
+	}
+},  
+  {
+    files: ['src/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 'latest',
       sourceType: 'module',
-      project: './tsconfig.json'
-    },
-    rules: {
-      '@typescript-eslint/no-explicit-any': [
-        'warn',
-        {
-          ignoreRestArgs: true
-        }
-      ],
-      '@typescript-eslint/no-inferrable-types': ['warn'],
-      '@typescript-eslint/no-redundant-type-constituents': ['warn'],
-      '@typescript-eslint/no-unnecessary-type-assertion': ['warn'],
-      'no-restricted-syntax': 'off',
-      'keyword-spacing': ['warn'],
-      'linebreak-style': ['off'] // adicionado porque uso windows
-    },
-    overrides: [
-      {
-        files: ['src/**/*.{js,ts}'] // Lint all JavaScript and TypeScript files in src and subdirectories
+      parserOptions: {
+        project: './tsconfig.json',
+        //tsconfigRootDir: __dirname,
       }
-    ]
+    }
   },
-    {
+
+  // Ignorar pastas e padrões de arquivos
+  {
     ignores: [
-      "lib/**",           // Ignora toda a pasta lib e seus arquivos
-      "coverage/**",      // Ignora toda a pasta coverage e seus arquivos
-      "*.lock",           // Ignora arquivos de lock
-      "WAProto/**",       // Ignora toda a pasta WAProto
-      "WASignalGroup/**",  // Ignora toda a pasta WASignalGroup
-	], 
+      "docs/**",
+      "lib/**",
+      "coverage/**",
+      "*.lock",
+      "WAProto/**",
+      "WASignalGroup/**",
+      "src/Tests/**", // why?
+	  "Example/**", // bug
+	  "eslint.config.js", // bug
+	  "jest.config.js", // bug
+	  "proto-extract/**", // bug
+    ]
   }
 ];
